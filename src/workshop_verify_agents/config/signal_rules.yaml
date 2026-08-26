@@ -1,0 +1,112 @@
+# signal_rules.yaml
+#
+# Human-readable specification of the rules implemented in
+# src/workshop_verify_agents/verification/signal_extractor.py.
+#
+# Each entry documents:
+#   id           - stable rule identifier referenced in code comments
+#   trigger      - the TraceEvent event_type that activates this rule
+#   condition    - optional condition on event metadata (prose description)
+#   signal_type  - the BusinessSignal.signal_type produced
+#   signal_name  - the BusinessSignal.signal_name produced
+#   severity     - base severity (low | medium | high | critical)
+#   description  - what this rule detects and why it matters
+
+rules:
+
+  # ── Safety ──────────────────────────────────────────────────────────────
+
+  - id: "RULE-S01"
+    trigger: "safety_check_completed"
+    condition: "metadata.action == 'allow'"
+    signal_type: "safety"
+    signal_name: "safety_compliance"
+    severity: "low"
+    description: >
+      The safety layer cleared the request without any intervention.
+      Confirms the agent is operating within expected safety bounds.
+
+  - id: "RULE-S02"
+    trigger: "safety_check_completed"
+    condition: "metadata.action in ('block', 'redact', 'warn')"
+    signal_type: "safety"
+    signal_name: "safety_risk"
+    severity: "critical"
+    description: >
+      The safety layer blocked or flagged the request.
+      Indicates a prompt-injection attempt, a regulated-advice violation,
+      or another prohibited content pattern.
+
+  # ── Routing ─────────────────────────────────────────────────────────────
+
+  - id: "RULE-R01"
+    trigger: "intent_classified"
+    condition: "always fires; severity scaled by metadata.confidence"
+    signal_type: "routing"
+    signal_name: "intent_routing"
+    severity: "low | medium | high (confidence-scaled)"
+    description: >
+      Intent classifier produced a domain label.
+      Low confidence (< 0.3) raises severity to 'high' to flag ambiguous
+      queries that may have been misrouted.
+
+  # ── Journey ─────────────────────────────────────────────────────────────
+
+  - id: "RULE-J01"
+    trigger: "route_selected"
+    condition: "always fires"
+    signal_type: "journey"
+    signal_name: "journey_routing"
+    severity: "low"
+    description: >
+      Orchestrator selected a domain route.
+      Provides a journey-level breadcrumb for stage classification downstream.
+
+  # ── Execution ───────────────────────────────────────────────────────────
+
+  - id: "RULE-E01"
+    trigger: "sub_agent_invoked"
+    condition: "always fires"
+    signal_type: "execution"
+    signal_name: "execution_path"
+    severity: "low"
+    description: >
+      A domain sub-agent was invoked.  Records which agent handled the turn
+      and the detected topic for audit trail completeness.
+
+  - id: "RULE-E02"
+    trigger: "tool_call_failed | sub_agent_failed"
+    condition: "always fires"
+    signal_type: "execution"
+    signal_name: "execution_reliability_risk"
+    severity: "high"
+    description: >
+      A tool call or sub-agent invocation reported a failure.
+      Indicates a reliability issue that may have degraded the customer
+      response or left a required step incomplete.
+
+  # ── Outcome ─────────────────────────────────────────────────────────────
+
+  - id: "RULE-O01"
+    trigger: "response_written"
+    condition: "always fires; severity raised if response_length < 50"
+    signal_type: "outcome"
+    signal_name: "outcome_availability"
+    severity: "low | medium (length-scaled)"
+    description: >
+      A customer-facing response was produced.
+      A very short response (< 50 chars) raises severity to 'medium' as it
+      may indicate a fallback or truncation rather than a useful answer.
+
+  # ── Operational ─────────────────────────────────────────────────────────
+
+  - id: "RULE-L01"
+    trigger: "route_selected | sub_agent_invoked (cross-event, same turn)"
+    condition: "same (event_type, component_name) fires > 1 time in one turn"
+    signal_type: "operational"
+    signal_name: "loop_risk"
+    severity: "high"
+    description: >
+      The same routing or invocation event fired multiple times within a
+      single conversation turn.  Suggests a planner loop, retry storm, or
+      orchestration bug that could cause degraded or inconsistent responses.

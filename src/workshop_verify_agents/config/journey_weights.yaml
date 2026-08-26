@@ -1,0 +1,49 @@
+# journey_weights.yaml
+#
+# Per-stage severity weights used by JourneyWeightedScorer.
+#
+# A weight of 1.0 is baseline.  Stages closer to a regulated action
+# (e.g. product recommendation, compliance sign-off) carry higher weights
+# so that verification failures at those stages are penalised more heavily.
+#
+# Weights must be positive floats.  The scorer normalises them internally.
+
+stages:
+  discovery:
+    weight: 0.5
+    description: "Customer is exploring options; low-stakes interaction."
+
+  fact_finding:
+    weight: 0.8
+    description: "Agent is gathering customer circumstances and goals."
+
+  recommendation:
+    weight: 1.5
+    description: >
+      Agent is presenting a product recommendation.
+      Failures here may constitute a mis-selling event.
+
+  compliance_check:
+    weight: 2.0
+    description: >
+      Agent is performing or referencing a regulatory check
+      (e.g. affordability, suitability, KYC).
+      Highest-stakes stage — failures are critical.
+
+  clarification:
+    weight: 0.7
+    description: "Agent is resolving ambiguity before proceeding."
+
+  objection_handling:
+    weight: 1.0
+    description: "Agent is responding to a customer objection or concern."
+
+  close:
+    weight: 1.2
+    description: >
+      Agent is summarising or confirming a decision.
+      Failures may affect audit trail completeness.
+
+  post_sale:
+    weight: 1.0
+    description: "Post-decision support and follow-up interactions."
