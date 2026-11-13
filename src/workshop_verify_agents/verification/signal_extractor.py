@@ -21,7 +21,6 @@ from workshop_verify_agents.verification.signal_schema import (
 )
 from workshop_verify_agents.verification.trace_schema import ExecutionTrace, TraceEvent
 
-
 # ---------------------------------------------------------------------------
 # Public API
 # ---------------------------------------------------------------------------
@@ -56,6 +55,12 @@ def _dispatch(event: TraceEvent, conversation_id: str) -> list[BusinessSignal]:
         "response_written":       _from_response_written,
         "tool_call_failed":       _from_failed_execution,
         "sub_agent_failed":       _from_failed_execution,
+        "recovery_attempted":     _from_recovery_event,
+        "recovery_succeeded":     _from_recovery_event,
+        "recovery_failed":        _from_recovery_event,
+        "escalation_required":    _from_escalation_event,
+        "escalation_performed":   _from_escalation_event,
+        "escalation_failed":      _from_escalation_event,
     }
     handler = handlers.get(event.event_type)
     return handler(event, conversation_id) if handler else []
@@ -197,6 +202,48 @@ def _from_failed_execution(event: TraceEvent, conversation_id: str) -> list[Busi
             f"(event_type='{event.event_type}'). "
             f"Details: {event.metadata.get('error', 'none provided')}."
         ),
+        source_event_ids=[event.event_id],
+    )]
+
+
+def _from_recovery_event(event: TraceEvent, conversation_id: str) -> list[BusinessSignal]:
+    """Represent explicit recovery state without inferring it from a response."""
+    status_by_event = {
+        "recovery_attempted": ("recovery_attempted", SignalSeverity.medium),
+        "recovery_succeeded": ("recovery_succeeded", SignalSeverity.low),
+        "recovery_failed": ("recovery_failed", SignalSeverity.critical),
+    }
+    signal_name, severity = status_by_event[event.event_type]
+    return [BusinessSignal(
+        conversation_id=conversation_id,
+        turn_id=event.turn_id,
+        signal_type=SignalType.operational,
+        signal_name=signal_name,
+        value=event.event_type,
+        severity=severity,
+        confidence=1.0,
+        explanation=f"Explicit tool recovery event: {event.event_type}.",
+        source_event_ids=[event.event_id],
+    )]
+
+
+def _from_escalation_event(event: TraceEvent, conversation_id: str) -> list[BusinessSignal]:
+    """Represent required escalation and the observed action explicitly."""
+    if event.event_type == "escalation_required":
+        signal_name, severity = "escalation_required", SignalSeverity.medium
+    elif event.event_type == "escalation_performed":
+        signal_name, severity = "escalation_performed", SignalSeverity.low
+    else:
+        signal_name, severity = "escalation_not_performed", SignalSeverity.critical
+    return [BusinessSignal(
+        conversation_id=conversation_id,
+        turn_id=event.turn_id,
+        signal_type=SignalType.governance,
+        signal_name=signal_name,
+        value=event.event_type,
+        severity=severity,
+        confidence=1.0,
+        explanation=f"Explicit escalation event: {event.event_type}.",
         source_event_ids=[event.event_id],
     )]
 

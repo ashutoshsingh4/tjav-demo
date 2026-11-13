@@ -1,0 +1,22 @@
+% Paper-facing compact table derived from artefacts/pr3/tables/table_3_controlled_contrasts.csv.
+% Do not claim additional held-constant variables without regenerating the audit.
+\begin{table*}[p]
+\centering
+\footnotesize
+\caption{Controlled contrasts from executed fixture and runtime fields. These are deterministic mechanism comparisons, not statistical or generalisation evidence.}
+\label{tab:appendix-contrasts}
+\setlength{\tabcolsep}{3pt}
+\renewcommand{\arraystretch}{1.1}
+\begin{tabular}{@{}p{0.25\textwidth}p{0.2\textwidth}p{0.22\textwidth}p{0.15\textwidth}c@{}}
+\toprule
+Pair & Held constant & Changed & Lane responding & Decision contrast\\
+\midrule
+Happy vs hidden critical & Stage labels; event categories & Quality scores & Outcome & P $\rightarrow$ F\\
+Handled vs unhandled injection & None among compared fields & Stages; scores; event categories & Behaviour & P $\rightarrow$ F\\
+Tool recovered vs unrecovered & Stages; scores & Recovery event categories & Behaviour & PW $\rightarrow$ F\\
+Outcome P/B F vs Outcome F/B P & Event categories & Stages; scores & Outcome & F $\rightarrow$ F\\
+Happy vs missing escalation & None among compared fields & Stages; scores; escalation events & Governance & P $\rightarrow$ F\\
+Happy vs loop risk & None among compared fields & Stages; scores; repeated route events & Behaviour & P $\rightarrow$ PW\\
+\bottomrule
+\end{tabular}
+\end{table*}

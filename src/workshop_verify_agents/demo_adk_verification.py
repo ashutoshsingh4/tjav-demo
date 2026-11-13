@@ -18,6 +18,7 @@ from workshop_verify_agents.demo_offline_verification import (
     _print_table,
 )
 from workshop_verify_agents.examples.conversations import get_exchanges, get_scenario, list_scenarios
+from workshop_verify_agents.integrations.client_errors import ClientProviderError
 from workshop_verify_agents.journey.journey_taxonomy import stage_weight
 from workshop_verify_agents.verification.offline_verifier import (
     verify_completed_conversation,
@@ -34,8 +35,7 @@ async def _run_adk_scenario(
     All turns share one event loop; per-turn asyncio.run() calls would bind
     litellm's background logging worker to a loop that no longer exists.
     """
-    # Importing the ADK runner creates the OpenAI-backed model, so defer it
-    # until this explicit ADK-only path is selected.
+    # Defer ADK imports until this explicit ADK-only path is selected.
     from workshop_verify_agents.adk_runtime.runner import ADKConversationRunner
 
     runner = ADKConversationRunner()
@@ -86,9 +86,9 @@ async def _demo_adk_verification_async(scenario_name: str) -> None:
 
     try:
         conversation_turns, behaviour_results = await _run_adk_scenario(scenario, conversation_id)
-    except OSError as exc:
+    except (OSError, ClientProviderError) as exc:
         print(f"ADK demo unavailable: {exc}")
-        print("Set OPENAI_API_KEY in your .env file.")
+        print("Configure MODEL_PROVIDER=openai, MODEL_NAME, and OPENAI_API_KEY.")
         return
 
     adk_exchanges = []

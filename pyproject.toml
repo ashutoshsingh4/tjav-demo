@@ -1,20 +1,23 @@
 [project]
-name = "agent-verification-demo"
+name = "tjav"
 version = "0.1.0"
-description = "Reproducible demo of trace-derived and journey-aware agent verification"
+description = "Trajectory and Journey-Aware Verifier"
+readme = "README.md"
 requires-python = ">=3.10,<3.14"
+license = { file = "LICENSE" }
 dependencies = [
-    "google-adk>=1.31.1,<2.0.0",
-    "litellm>=1.80.8,<2.0.0",
-    "pydantic>=2.0.0,<3.0.0",
-    "python-dotenv>=1.0.0,<2.0.0",
-    "truststore>=0.10.0,<1.0.0",
+    "pydantic>=2.0",
 ]
 
-[dependency-groups]
-dev = [
-    "pytest>=8.0.0,<9.0.0",
-    "ruff>=0.11.11,<1.0.0",
+[[tool.uv.index]]
+name = "pypi"
+url = "https://pypi.org/simple/"
+default = true
+
+[project.optional-dependencies]
+adk = [
+    "google-adk>=2.0.0,<3.0.0",
+    "openai>=2.0.0,<3.0.0",
 ]
 
 [build-system]
@@ -22,11 +25,16 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/model", "src/workshop_verify_agents"]
-
-[tool.pytest.ini_options]
-pythonpath = ["src"]
+packages = ["src/workshop_verify_agents"]
 
 [tool.ruff]
 line-length = 120
-target-version = "py312"
+target-version = "py310"
+
+[dependency-groups]
+dev = [
+    "pytest>=8.0.0,<9.0.0",
+    "ruff>=0.11.11,<1.0.0",
+    "google-adk>=2.0.0,<3.0.0",
+    "openai>=2.0.0,<3.0.0",
+]

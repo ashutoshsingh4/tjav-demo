@@ -13,8 +13,8 @@ synthetic (default)
 
 adk
     Uses the real Google ADK agent pipeline in
-    ``workshop_verify_agents.adk_runtime``.  Requires ``OPENAI_API_KEY``
-    in ``.env``.
+    ``workshop_verify_agents.adk_runtime``. Set ``MODEL_PROVIDER=openai``,
+    ``MODEL_NAME`` to the model ID, and provide ``OPENAI_API_KEY``.
 
 Both modes feed the same generic verification pipeline:
     ExecutionTrace → BusinessSignals → BehaviourEvidence → BehaviourAssessment
@@ -26,6 +26,7 @@ import argparse
 import textwrap
 from uuid import uuid4
 
+from workshop_verify_agents.integrations.client_errors import ClientProviderError
 from workshop_verify_agents.synthetic_runtime.orchestrator import run as _synthetic_run
 from workshop_verify_agents.verification.evidence_schema import (
     AssessmentStatus,
@@ -88,9 +89,9 @@ def _run_adk(query: str, conversation_id: str) -> tuple[str, ExecutionTrace]:
     """
     try:
         from workshop_verify_agents.adk_runtime.runner import run_adk_conversation
-    except OSError as exc:
+    except (OSError, ClientProviderError) as exc:
         print(f"\n{_BOLD + _RED}ADK mode unavailable:{_RESET} {exc}")
-        print("Set OPENAI_API_KEY in your .env file.")
+        print("Configure MODEL_PROVIDER=openai, MODEL_NAME, and OPENAI_API_KEY.")
         raise SystemExit(1) from exc
 
     return run_adk_conversation(query, conversation_id)
@@ -275,6 +276,4 @@ def _parse_args() -> argparse.Namespace:
 if __name__ == "__main__":
     args = _parse_args()
     demo(args.query, mode=args.mode)
-
-
 

@@ -1,0 +1,31 @@
+% Paper-facing compact table aligned with the current scenario-support metadata.
+% Revalidate support and placement claims against the generator before changing.
+\begin{table*}[p]
+\centering
+\footnotesize
+\caption{Scenario support matrix for the controlled scenarios. Runtime support and expectation checks are derived from executed reports; placement is a paper organization choice, not a scientific result.}
+\label{tab:appendix-support}
+\setlength{\tabcolsep}{3pt}
+\renewcommand{\arraystretch}{1.08}
+\begin{tabular}{@{}p{0.23\textwidth}p{0.27\textwidth}cccc@{}}
+\toprule
+Scenario & Mechanism & Runtime & Distinct path & Expectations & Placement\\
+\midrule
+Mortgage happy path & Nominal & Yes & No & Yes & Main\\
+Handled injection & Effective injection control & Yes & Yes & Yes & Main\\
+Guaranteed-return failure & Guarantee-policy failure & Yes & Yes & Yes & Appendix\\
+Hidden eligibility failure & Hidden eligibility weakness & Yes & Yes & Yes & Appendix\\
+Investment suitability failure & Suitability weakness & Yes & Yes & Yes & Appendix\\
+Unhandled injection & Unhandled injection & Yes & Yes & Yes & Appendix\\
+Routing failure & Repeated routing & Yes & Yes & Yes & Appendix\\
+Recovered tool failure & Recovery success & Yes & Yes & Yes & Main\\
+Unrecovered tool failure & Recovery failure & Yes & Yes & Yes & Main\\
+Loop risk & Loop risk & Yes & Yes & Yes & Appendix\\
+Missing escalation & Missing escalation & Yes & Yes & Yes & Main\\
+Critical-stage hidden weakness & Critical-stage weakness & Yes & Yes & Yes & Main\\
+Recommendation-stage failure & Recommendation failure & Yes & Yes & Yes & Appendix\\
+Outcome P / behaviour F & Outcome P / behaviour F & Yes & Yes & Yes & Main\\
+Outcome F / behaviour P & Outcome F / behaviour P & Yes & Yes & Yes & Main\\
+\bottomrule
+\end{tabular}
+\end{table*}

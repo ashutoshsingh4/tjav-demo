@@ -1,0 +1,211 @@
+\documentclass{article}
+
+% \usepackage[dblblindworkshop]{neurips_2026}
+\usepackage[final,dblblindworkshop]{neurips_2026}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{amsmath}
+\usepackage{array}
+\usepackage[table]{xcolor}
+\usepackage{hyperref}
+
+\graphicspath{{../figures/}{figures/}}
+\newcommand{\statuspass}{\textcolor{green!50!black}{\textbf{P}}}
+\newcommand{\statuswarn}{\textcolor{orange!80!black}{\textbf{PW}}}
+\newcommand{\statusfail}{\textcolor{red!75!black}{\textbf{F}}}
+\newcommand{\statusna}{\textcolor{gray}{N/A}}
+\setlength{\textfloatsep}{6pt plus 1pt minus 2pt}
+\setlength{\floatsep}{4pt plus 1pt minus 1pt}
+\workshoptitle{Interpreting Agent Behavior}
+
+\title{From Agent Traces to Assurance Interpretations: Behaviour- and Journey-Aware Evidence for Conversational Agents}
+
+% \author{Anonymous Author(s)}
+\author{%
+  Ashutosh Singh \\
+  University of Stirling / Lloyds Banking Group \\
+  \texttt{ashutosh.singh@stir.ac.uk} / \texttt{ashutosh.singh4@lloydsbanking.com}
+}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+Outcome scores can indicate that a conversational-agent task appears successful without explaining what occurred during execution or where a weakness arose. Raw runtime traces provide observations, but do not automatically constitute human-understandable assurance evidence; journey averages can also dilute weaknesses in configured critical stages. We present a controlled assurance-evidence demonstration: an assurance-oriented behavioural interpretation demonstrator that transforms selected runtime events into control-oriented evidence and provenance, alongside a separate journey-aware outcome lane. The deterministic demonstrator compares flat mean, minimum-turn, critical-stage-only, critical-stage gate, and journey-weighted outcomes with behaviour-only, journey-only, and unified assessments across 15 author-constructed controlled scenarios. The scenarios show controlled contrasts in policy response, loop and routing behaviour, recovery, escalation, and critical-stage outcomes. Journey stages and scores are researcher-supplied fixture inputs, while interpretations are derived from implemented events, signals, controls, and evidence rules. No reported result uses a live model or external service; the demonstrator makes no production-scale, human-rated, statistical, benchmark, superiority, or generalisation claim.
+\end{abstract}
+
+\section{Introduction}
+Outcome evaluation is useful for asking whether an interaction appears successful, but an acceptable score need not explain the path that produced it. A runtime trace may show routing, tool calls, recovery, safety checks, and responses, yet those observations require interpretation before human assurance review. A flat score can also dilute a weakness in a configured critical stage such as eligibility, suitability, or recommendation. Existing agent benchmarks, trajectory evaluations, and judge-based methods provide useful capability and quality perspectives \cite{agentbench,agentboard,gaia,taubench,mtbench,llmjudge_survey,wang2025agent_eval_survey}, while trace observability and prompt-injection studies motivate process inspection \cite{langgraph_tracing,foundry_tracing,agentdojo}. Runtime verification likewise emphasises interpretation against explicit specifications \cite{leucker2009runtime}.
+
+This paper studies the narrower downstream problem of turning selected observations into control-oriented accounts. We ask: \emph{How can trace-derived behavioural interpretations and journey-aware outcome evidence expose or qualify assurance-relevant conditions that aggregate outcomes alone do not reveal in controlled scenarios?} We use behavioural interpretation in a constrained assurance-oriented sense: selected observations are mapped to explicit controls, evidence and decisions rather than an open-ended behaviour taxonomy. The demonstrator does not universally interpret agent behaviour. It evaluates a deterministic implementation whose inputs, controls, thresholds, and weights are explicit.
+
+This focus complements work on machine behaviour as an observational lens \cite{rahwan2019machinebehaviour}, software-engineering agent trajectories \cite{yang2024sweagent}, and descriptive agent-behaviour vocabularies \cite{gao2026interpretagent}.
+
+Our contributions are fourfold:
+\begin{enumerate}
+\item \textbf{Trace-to-interpretation pipeline (C1).} Selected runtime events are transformed into an assurance-oriented behavioural interpretation with normalised provenance.
+\item \textbf{Complementary evidence lanes (C2).} Behaviour/policy evidence and journey-aware outcome evidence retain separate meanings before entering a unified decision policy.
+\item \textbf{Controlled comparison (C3).} Five outcome methods and three assessment modes are compared across deterministic scenarios without changing the existing scoring configuration.
+\item \textbf{Controlled assurance-evidence demonstration (C4).} Structured expectations, provenance validation, and generated reports make the controlled derivations inspectable.
+\end{enumerate}
+
+The implementation, deterministic scenarios, tests, and reproduction
+instructions are provided in the TJAV repository.\footnote{%
+\url{https://github.com/ashutoshsingh4/tjav-demo}}
+
+\section{Method}
+The separation of observed executions from configured controls follows the runtime-verification principle of checking executions against explicit specifications \cite{leucker2009runtime}. Cognitive-architecture accounts distinguish internal and external agent actions \cite{sumers2024coala}; this implementation instead retains only the observable subset needed by its assurance controls.
+The pipeline begins with an ordered framework-agnostic \texttt{ExecutionTrace}. Observed events include safety checks, route selections, tool failures, explicit recovery transitions, escalation requirements or omissions, and response production. These are runtime facts, not assurance conclusions. Signals derive from event fields: repeated route or invocation events produce loop-risk signals; explicit recovery events produce recovery signals; escalation events produce governance signals; and response events produce outcome-availability signals.
+
+The interpretation layer groups these observations into a small, authored, implementation-grounded assurance-oriented behaviour vocabulary. Functional groups cover safety and risk, routing and loop behaviour, tool execution and recovery, policy and control response, escalation, response availability, and critical journey-stage weakness. Representative categories are \texttt{SAFETY\_CHECK\_COMPLETED}, \texttt{ROUTE\_SELECTED}, \texttt{LOOP\_RISK\_DETECTED}, \texttt{TOOL\_CALL\_FAILED}, \texttt{RECOVERY\_SUCCEEDED}, \texttt{POLICY\_VIOLATION}, \texttt{ESCALATION\_OMITTED}, and \texttt{CRITICAL\_STAGE\_WEAKNESS}. The complete vocabulary is in the appendix and demonstrator outputs. It is neither comprehensive nor empirically derived.
+
+Configured controls are kept separate from observations. A detected prompt-injection risk is checked against the configured response policy and observed response properties; effective handling yields control-effective evidence, while leakage or missing safe response yields control-ineffective evidence. A required escalation is represented by an explicit requirement event followed by a performed, omitted, or failed escalation event. A tool failure is distinct from recovery attempted, recovery succeeded, and recovery failed; recovered failure remains operationally visible as a warning, while unrecovered failure is operational FAIL. These interpretations preserve links to source events and derived signals.
+
+The outcome lane receives one supplied stage label and one supplied quality score per exchange. Its baselines are: flat mean $n^{-1}\sum_i s_i$; minimum turn $\min_i s_i$; critical-stage-only, the arithmetic mean over configured critical stages (N/A when none apply); critical-stage gate, which applies configured critical-stage cutoffs before the flat-mean rating; and journey weighted $\sum_i s_iw_i/\sum_iw_i$. Existing PASS, WARNING, and FAIL thresholds and stage weights are unchanged. These values are fixture inputs, not observations generated by the agent.
+
+Assessment modes compose the same evidence: \texttt{behaviour-only} assesses behaviour, governance, and operational evidence without requiring outcome evidence; \texttt{journey-only} assesses outcome evidence; and \texttt{unified} assesses both. A behaviour or governance or operational FAIL is a FAIL; warnings without FAIL produce PASS WITH WARNINGS; all applicable evidence PASS produces PASS; no evidence is INDETERMINATE. Outcome FAIL and governance FAIL remain hard failures. Provenance distinguishes observations, supplied inputs, configured controls, derived evidence, and final decisions.
+
+The control layer is related to behavioural testing against targeted expected behaviours rather than aggregate accuracy alone \cite{ribeiro2020checklist}. Explicit recovery events also connect to prior work on reasoning, acting, and reflection in language agents \cite{yao2023react,shinn2023reflexion}, without claiming to model those constructs generally.
+
+\begin{figure*}[t]
+\centering
+\includegraphics[width=\textwidth]{Interpretation_framework_v1.png}
+\caption{Behaviour- and journey-aware assurance interpretation framework. The behaviour/governance lane transforms runtime observations into interpreted evidence and assurance judgements, while the journey lane evaluates supplied stage scores. The unified layer combines both using an explicit policy. Reported results use the deterministic offline path.}
+\label{fig:framework}
+\end{figure*}
+
+\section{Controlled Results}
+Where benchmark scores primarily characterise task or response outcomes \cite{agentbench,agentboard,gaia,taubench}, the controlled cases examine whether behaviour/governance and journey evidence reveal different conditions.
+All scenarios are deterministic and run offline; remaining cases are retained in the appendix.
+
+\begin{figure*}[t]
+\centering
+\includegraphics[width=\textwidth]{controlled_contrasts_v1.png}
+\caption{Controlled evidence-lane contrasts. Failures in either behaviour/governance or journey evidence remain visible in the unified decision. Recovered and unrecovered tool failures produce different operational outcomes. Examples are deterministic fixtures rather than statistical evidence.}
+\label{fig:contrasts}
+\end{figure*}
+
+\begin{table}[t]
+\centering
+\small
+\caption{Selected controlled results. P, PW, and F denote PASS, PASS WITH WARNINGS, and FAIL. Scores and journey stages are supplied fixture inputs; statuses are derived from the executed evidence pipeline.}
+\label{tab:selected}
+\setlength{\tabcolsep}{3.5pt}
+\renewcommand{\arraystretch}{1.12}
+\begin{tabular}{@{}p{0.25\linewidth}ccccc p{0.25\linewidth}@{}}
+\toprule
+Scenario & Flat & Journey & Behaviour & Unified & What becomes visible\\
+\midrule
+Mortgage happy path & 0.9167 P & 0.9192 P & \statuspass & \statuspass & Nominal evidence\\
+Handled injection & 0.8867 P & 0.8810 P & \statuspass & \statuspass & Effective control retained\\
+Outcome P / behaviour F & 0.9500 P & 0.9500 P & \statusfail & \statusfail & Policy failure despite outcome PASS\\
+Hidden critical stage & 0.8000 P & 0.5750 F & \statuspass & \statusfail & Critical-stage weakness\\
+Recovered tool failure & 0.8600 P & 0.8600 P & \statuswarn & \statuswarn & Recovery remains auditable\\
+Unrecovered tool failure & 0.8600 P & 0.8600 P & \statusfail & \statusfail & Unrecovered execution failure\\
+Outcome F / behaviour P & 0.4000 F & 0.4000 F & \statuspass & \statusfail & Outcome failure despite nominal behaviour\\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The nominal and handled-injection cases remain PASS. An acceptable journey outcome does not erase a policy failure, while nominal behaviour evidence does not erase a failing journey outcome; recovery success produces PASS WITH WARNINGS, whereas recovery failure produces FAIL.
+
+\section{Discussion and Limitations}
+Descriptive behavioural vocabularies and trajectory-inspection tools aim to make agent runs human-readable \cite{gao2026interpretagent,desmond2025trajectoryexplorer}. 
+This demonstrator connects selected runtime observations to controls, evidence statuses, and assurance decisions, bridging descriptive interpretation and specification-based behavioural testing
+\cite{ribeiro2020checklist,leucker2009runtime}. Whereas Act\textperiodcentered ONOMY describes what happened, this demonstrator explains why selected observed behaviours matter under a specified assurance policy. It complements, rather than replaces, evaluation analysis and failure studies
+\cite{kapoor2024agentsmatter,cemri2025multiagentfailures}.
+
+The authored 19-category vocabulary reflects implemented event schemas
+and assurance requirements; it is neither corpus-derived nor validated
+through human coding agreement \cite{gao2026interpretagent}.
+Interpretation usefulness for human understanding or oversight remains
+unevaluated \cite{bowman2022scalableoversight}.
+Evidence is limited to deterministic synthetic fixtures with narrow
+domain and scenario coverage, supplied turn-level scores and journey-stage
+labels, and configured weights, thresholds, and controls.
+There are no production trajectories, statistical tests, human-rated
+outcome quality assessments, large-scale behaviour mining, demonstrated
+vocabulary transfer across event schemas, or cross-framework quantitative
+validation. The optional ADK route is excluded from reported results.
+Unvalidated policies or controls risk false assurance if treated as
+authoritative. Results demonstrate implementation behaviour and evidence
+propagation, not real-world safety, reliability, interpretability,
+or generalisation.
+
+\section{Conclusion}
+This deterministic demonstration combines provenance-linked behaviour evidence with supplied journey outcomes. Controlled scenarios expose policy, recovery, escalation, loop, and critical-stage conditions that aggregate outcomes can obscure; failures in either lane remain visible in the unified decision. These fixtures do not establish human usefulness, production validity, statistical inference, or transfer beyond the implemented schemas and policies.
+
+
+\bibliographystyle{plainnat}
+\bibliography{references}
+
+\appendix
+\section{Reproducibility and Complete Coverage}
+All reported results were generated through a deterministic offline path
+without a live model or external service. The implementation checks
+structured expectations and provenance after deriving results; expected
+decisions are not scoring inputs. The TJAV (Trajectory and Journey-Aware
+Verifier) source code, 15 deterministic scenarios, tests, and reproduction
+instructions are available at
+\url{https://github.com/ashutoshsingh4/tjav-demo}.
+
+From the repository root, install the environment and regenerate the
+scenario reports and four report-table families with:
+\begin{verbatim}
+uv sync
+uv run python -m workshop_verify_agents.assurance_interpretation \
+  --output-dir output
+\end{verbatim}
+
+\section{Worked trace-to-evidence example}
+The handled prompt-injection scenario detects a runtime risk and compares the observed response with configured refusal, instruction-protection, safe-response, and redirection requirements. All checks match, governance remains PASS, and provenance is retained; risk detection alone does not determine failure.
+\begin{figure*}[t]
+\centering
+\includegraphics[width=\textwidth]{trace_evidence_int_example_v1.png}
+\caption{Worked prompt-injection interpretation. A runtime safety observation identifies the relevant risk and configured response control. The observed response is compared with refusal, instruction-protection, safe-response, and redirection requirements. The matched control produces CONTROL\_EFFECTIVE and governance PASS while preserving provenance from event through interpretation, control comparison, and evidence.}
+\label{fig:prompt-injection}
+\end{figure*}
+
+The full generated baseline and ablation table is included below. The complete scenario support and controlled-contrast tables are generated from executed reports rather than manually maintained paper results.
+
+The baseline table answers how the five outcome methods and three assessment modes behave across all controlled scenarios.
+\input{generated_tables/appendix_baselines_compact.tex}
+
+The coverage table answers which distinct runtime observations and interpreted categories are present; repeated per-turn observations are deduplicated for readability.
+\input{generated_tables/appendix_behaviour_coverage_compact.tex}
+
+\section{Complete Behaviour Vocabulary}
+The implementation-grounded assurance-oriented behaviour vocabulary contains:
+\begin{itemize}
+\item safety and risk: \texttt{SAFETY\_CHECK\_COMPLETED}, \texttt{RISK\_DETECTED};
+\item controls: \texttt{CONTROL\_APPLIED}, \texttt{CONTROL\_EFFECTIVE}, \texttt{CONTROL\_INEFFECTIVE}, \texttt{POLICY\_VIOLATION};
+\item routing: \texttt{ROUTE\_SELECTED}, \texttt{REPEATED\_ROUTING}, \texttt{LOOP\_RISK\_DETECTED};
+\item tools and recovery: \texttt{TOOL\_CALL\_FAILED}, \texttt{RECOVERY\_ATTEMPTED}, \texttt{RECOVERY\_SUCCEEDED}, \texttt{RECOVERY\_FAILED};
+\item escalation: \texttt{ESCALATION\_REQUIRED}, \texttt{ESCALATION\_PERFORMED}, \texttt{ESCALATION\_OMITTED};
+\item delivery and journey: \texttt{RESPONSE\_PRODUCED}, \texttt{RESPONSE\_MISSING}, \texttt{CRITICAL\_STAGE\_WEAKNESS}.
+\end{itemize}
+\texttt{ROUTE\_MISMATCH} is not included because no expected-route comparison is implemented.
+
+\section{Controlled contrasts}
+The compact contrast table identifies the variables actually held constant or changed according to the generated PR3 audit.
+\input{generated_tables/appendix_controlled_contrasts_compact.tex}
+
+The generated contrasts compare actual fixture and runtime fields rather than asserting idealized matched pairs. Nominal and hidden-critical-stage cases share stage labels and observed event categories but change quality scores. Handled and unhandled injection differ in stage labels, scores, and observed control events, so their contrast is not a single-variable experiment. Recovered and unrecovered tool cases share stages and scores but differ in recovery event categories. The two lane-isolation cases share observed event categories but differ in scores and stages. Normal and missing-escalation cases differ in scores, stages, and escalation events. Normal and loop-risk cases differ in scores, stages, and repeated route events.
+
+\section{Scenario support and allocation}
+The support table summarizes runtime support, distinct paths, expectation validation, and paper placement for all 15 scenarios.
+\input{generated_tables/appendix_scenario_support_compact.tex}
+
+\section{Scenario Allocation and Audit}
+The main-paper exemplars are mortgage happy path, handled injection, outcome PASS/behaviour FAIL, hidden critical-stage weakness, recovered tool failure, unrecovered tool failure, missing escalation, and outcome FAIL/behaviour PASS. Routing failure, loop risk, unhandled injection, guaranteed-return failure, suitability failure, and recommendation-stage failure provide appendix or artefact coverage. Shared paths are retained for intentional lane contrasts. The generated redundancy audit identifies the unhandled-injection/outcome-PASS-behaviour-FAIL pair and routing/loop pair as intentional controlled pairs; recommendation-stage failure and outcome-FAIL/behaviour-PASS remain a redundant candidate pending review, but neither is removed.
+
+\section{Implementation Notes}
+The five original scenario decisions are unchanged: mortgage happy path PASS; handled injection PASS; guaranteed-return policy failure FAIL; hidden eligibility PASS WITH WARNINGS; and investment suitability FAIL. PR2.1 introduced explicit recovery and escalation semantics, changed unrecovered tool failure to operational FAIL, and changed missing escalation to governance FAIL. Behaviour-only loop and routing warnings now produce PASS WITH WARNINGS without outcome evidence. The generated reports distinguish these derived results from supplied stages and scores.
+
+The NeurIPS checklist is retained through the inherited template input below. Its answer macros remain source-controlled checklist material and should be completed or reviewed by the submitting authors against the final paper and artefact evidence.
+% Finish all appendix text above this point.
+
+\clearpage
+\input{checklist_int_agent.tex}
+
+\end{document}
