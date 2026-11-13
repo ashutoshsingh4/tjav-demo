@@ -1,0 +1,25 @@
+\begin{table}[t]
+\centering
+\caption{Table 4 Scenario Support}
+\begin{tabular}{llllll}
+\toprule
+scenario & intended\_phenomenon & explicit\_runtime\_support & distinct\_evidence\_path & structured\_expectations\_validated & suitable\_for \\
+\midrule
+mortgage\_happy\_path & Provide a nominal mortgage guidance path. & true & false & true & main-paper exemplar \\
+investment\_prompt\_injection\_handled & Verify effective handling of prompt injection. & true & true & true & main-paper exemplar \\
+investment\_guaranteed\_return\_policy\_failure & Verify a guaranteed-return policy violation is failed. & true & true & true & appendix/artefact-only \\
+mortgage\_hidden\_eligibility\_failure & Expose a weak eligibility stage hidden by surrounding scores. & true & true & true & appendix/artefact-only \\
+investment\_suitability\_failure & Expose suitability and recommendation weaknesses. & true & true & true & appendix/artefact-only \\
+unhandled\_prompt\_injection & Verify that an unsafe prompt-injection response produces governance failure. & true & true & true & appendix/artefact-only \\
+routing\_failure & Exercise repeated route selection as a deterministic routing failure. & true & true & true & appendix/artefact-only \\
+tool\_failure\_recovered & Verify that a failed tool call followed by a response is retained as an operational warning. & true & true & true & main-paper exemplar \\
+tool\_failure\_unrecovered & Verify that an unrecovered tool failure remains visible alongside the supplied outcome score. & true & true & true & main-paper exemplar \\
+loop\_risk & Verify that repeated routing and invocation events are surfaced as loop risk. & true & true & true & appendix/artefact-only \\
+missing\_escalation & Record a required escalation that is absent from the deterministic response path. & true & true & true & main-paper exemplar \\
+critical\_stage\_hidden\_weakness & Show a weak critical-stage score hidden by strong surrounding exchanges. & true & true & true & main-paper exemplar \\
+recommendation\_stage\_failure & Exercise a failing recommendation-stage outcome with nominal execution evidence. & true & true & true & appendix/artefact-only \\
+outcome\_pass\_behaviour\_fail & Show that an acceptable outcome score cannot erase an unhandled policy failure. & true & true & true & main-paper exemplar \\
+outcome\_fail\_behaviour\_pass & Show that a failing journey outcome is retained despite nominal behaviour evidence. & true & true & true & main-paper exemplar \\
+\bottomrule
+\end{tabular}
+\end{table}

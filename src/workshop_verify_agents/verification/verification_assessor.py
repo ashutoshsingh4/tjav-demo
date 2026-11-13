@@ -37,7 +37,6 @@ from workshop_verify_agents.verification.signal_schema import (
     SignalSeverity,
 )
 
-
 # ---------------------------------------------------------------------------
 # Public API
 # ---------------------------------------------------------------------------
@@ -46,6 +45,7 @@ def assess(
     evidence_items: list[VerificationEvidence],
     signals: list[BusinessSignal],
     conversation_id: str,
+    allow_missing_outcome: bool = False,
 ) -> VerificationAssessment:
     """Apply assessment rules and return a ``VerificationAssessment``.
 
@@ -86,6 +86,13 @@ def assess(
                 f"Governance FAIL: {gov.explanation}"
             )
 
+    for evidence_type in (EvidenceType.behaviour, EvidenceType.operational):
+        for item in by_type.get(evidence_type, []):
+            if item.status == EvidenceStatus.fail:
+                failures.append(
+                    f"{evidence_type.value.capitalize()} FAIL: {item.explanation}"
+                )
+
     # ── Rule 1b: any outcome-level fail (including journey-aware) ─────────
     outcome_items = by_type.get(EvidenceType.outcome, [])
     for out in outcome_items:
@@ -106,7 +113,7 @@ def assess(
         for item in outcome_items
     )
     outcome_ok = has_success_like_outcome and not has_outcome_fail
-    if loop_signal_ids and not outcome_ok:
+    if loop_signal_ids and not outcome_ok and not allow_missing_outcome:
         failures.append(
             "Behaviour FAIL: routing loop detected and no successful outcome evidence. "
             "The agent may have failed to deliver a response."

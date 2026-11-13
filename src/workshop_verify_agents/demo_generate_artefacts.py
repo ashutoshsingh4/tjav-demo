@@ -1,4 +1,4 @@
-"""Generate and persist verification pipeline artefacts for all five scenarios.
+"""Generate and persist verification pipeline artefacts for all registered scenarios.
 
 Default layout (overwrite on each run — stable path for paper reference):
 
@@ -93,7 +93,7 @@ def generate_scenario_artefacts(scenario_name: str, output_dir: Path) -> None:
     )
 
     print(f"  {scenario_name}: {unified.final_assessment.overall_status} "
-          f"({len(written)} files → {output_dir / scenario_name})")
+          f"({len(written)} files -> {output_dir / scenario_name})")
 
 
 def generate_all_artefacts(output_dir: Path | None = None, timestamped: bool = False) -> None:
@@ -119,7 +119,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--scenario",
         default=None,
-        help="Run a single named scenario instead of all five.",
+        help="Run a single named scenario instead of all registered scenarios.",
     )
     parser.add_argument(
         "--timestamped",

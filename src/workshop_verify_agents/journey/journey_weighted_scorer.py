@@ -12,6 +12,20 @@ from workshop_verify_agents.journey.journey_taxonomy import JourneyStage, coerce
 
 
 @dataclass(frozen=True)
+class BaselineResult:
+  """Comparable result for an outcome baseline calculation."""
+
+  method: str
+  score: float | None
+  rating: str
+  thresholds: dict[str, float]
+  stages_included: list[str]
+  turn_ids_included: list[str]
+  explanation: str
+  provenance: list[str]
+
+
+@dataclass(frozen=True)
 class StageScoreBreakdown:
   """Contribution of a single turn to the weighted aggregate."""
 
@@ -27,6 +41,146 @@ def simple_average_score(turn_scores: list[float]) -> float:
   if not turn_scores:
     return 0.0
   return round(sum(turn_scores) / len(turn_scores), 4)
+
+
+def _baseline_rating(score: float, pass_threshold: float, warning_threshold: float) -> str:
+  if score >= pass_threshold:
+    return "PASS"
+  if score >= warning_threshold:
+    return "WARNING"
+  return "FAIL"
+
+
+def _baseline_context(
+  method: str,
+  score: float | None,
+  rating: str,
+  turn_scores: list[float],
+  journey_stages: list[JourneyStage | str],
+  turn_ids: list[str] | None,
+  thresholds: dict[str, float],
+  explanation: str,
+) -> BaselineResult:
+  if len(turn_scores) != len(journey_stages):
+    raise ValueError("turn_scores and journey_stages must have the same length")
+  resolved_ids = turn_ids or [str(index) for index in range(len(turn_scores))]
+  if len(resolved_ids) != len(turn_scores):
+    raise ValueError("turn_ids must have the same length as turn_scores")
+  return BaselineResult(
+    method=method,
+    score=score,
+    rating=rating,
+    thresholds=thresholds,
+    stages_included=[coerce_stage(stage).value for stage in journey_stages],
+    turn_ids_included=list(resolved_ids),
+    explanation=explanation,
+    provenance=[f"turn:{turn_id}" for turn_id in resolved_ids],
+  )
+
+
+def minimum_turn_baseline(
+  turn_scores: list[float],
+  journey_stages: list[JourneyStage | str],
+  turn_ids: list[str] | None = None,
+  pass_threshold: float = 0.75,
+  warning_threshold: float = 0.60,
+) -> BaselineResult:
+  """Rate a conversation by its lowest supplied turn score."""
+  score = min(turn_scores) if turn_scores else None
+  rating = "NOT_APPLICABLE" if score is None else _baseline_rating(
+    score, pass_threshold, warning_threshold,
+  )
+  return _baseline_context(
+    "minimum_turn", None if score is None else round(score, 4), rating,
+    turn_scores, journey_stages, turn_ids,
+    {"pass": pass_threshold, "warning": warning_threshold},
+    "The rating is determined by the lowest supplied turn score.",
+  )
+
+
+def critical_stage_only_baseline(
+  turn_scores: list[float],
+  journey_stages: list[JourneyStage | str],
+  turn_ids: list[str] | None = None,
+  pass_threshold: float = 0.75,
+  warning_threshold: float = 0.60,
+) -> BaselineResult:
+  """Rate using only turns in configured critical journey stages."""
+  critical = {
+    JourneyStage.eligibility_or_suitability,
+    JourneyStage.recommendation_or_guidance,
+  }
+  if len(turn_scores) != len(journey_stages):
+    raise ValueError("turn_scores and journey_stages must have the same length")
+  critical_indexes = [
+    index for index, stage_value in enumerate(journey_stages)
+    if coerce_stage(stage_value) in critical
+  ]
+  selected_scores = [turn_scores[index] for index in critical_indexes]
+  selected_stages = [journey_stages[index] for index in critical_indexes]
+  selected_ids = None if turn_ids is None else [turn_ids[index] for index in critical_indexes]
+  if not selected_scores:
+    return _baseline_context(
+      "critical_stage_only", None, "NOT_APPLICABLE", [], [], [],
+      {"pass": pass_threshold, "warning": warning_threshold},
+      "Not applicable because no configured critical-stage turns are present.",
+    )
+  score = round(simple_average_score(selected_scores), 4)
+  return _baseline_context(
+    "critical_stage_only", score,
+    _baseline_rating(score, pass_threshold, warning_threshold),
+    selected_scores, selected_stages, selected_ids,
+    {"pass": pass_threshold, "warning": warning_threshold},
+    "The rating uses the arithmetic mean of configured critical-stage turns.",
+  )
+
+
+def critical_stage_gate_baseline(
+  turn_scores: list[float],
+  journey_stages: list[JourneyStage | str],
+  turn_ids: list[str] | None = None,
+  pass_threshold: float = 0.75,
+  warning_threshold: float = 0.60,
+  critical_warning_threshold: float = 0.75,
+  critical_fail_threshold: float = 0.55,
+) -> BaselineResult:
+  """Apply critical-stage gates before falling back to the flat-mean rating."""
+  if critical_fail_threshold > critical_warning_threshold:
+    raise ValueError("critical_fail_threshold must not exceed critical_warning_threshold")
+  critical = {
+    JourneyStage.eligibility_or_suitability,
+    JourneyStage.recommendation_or_guidance,
+  }
+  if len(turn_scores) != len(journey_stages):
+    raise ValueError("turn_scores and journey_stages must have the same length")
+  critical_indexes = [
+    index for index, stage_value in enumerate(journey_stages)
+    if coerce_stage(stage_value) in critical
+  ]
+  critical_scores = [turn_scores[index] for index in critical_indexes]
+  flat_score = simple_average_score(turn_scores) if turn_scores else None
+  rating = "NOT_APPLICABLE" if flat_score is None else _baseline_rating(
+    flat_score, pass_threshold, warning_threshold,
+  )
+  if critical_scores and min(critical_scores) < critical_fail_threshold:
+    rating = "FAIL"
+    explanation = "A critical-stage score breached the configured FAIL gate."
+  elif critical_scores and min(critical_scores) < critical_warning_threshold:
+    rating = "WARNING"
+    explanation = "A critical-stage score breached the configured WARNING gate."
+  else:
+    explanation = "No critical-stage gate was breached; the flat-mean rating was used."
+  return _baseline_context(
+    "critical_stage_gate", flat_score, rating,
+    turn_scores, journey_stages, turn_ids,
+    {
+      "pass": pass_threshold,
+      "warning": warning_threshold,
+      "critical_warning": critical_warning_threshold,
+      "critical_fail": critical_fail_threshold,
+    },
+    explanation,
+  )
 
 
 def journey_weighted_score(

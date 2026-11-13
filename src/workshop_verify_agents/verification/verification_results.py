@@ -45,6 +45,7 @@ class UnifiedConversationResult(BaseModel):
     behaviour_evidence_conversation_scope: list[VerificationEvidence] = Field(default_factory=list)
     outcome_result: ConversationOutcomeResult | None = None
     final_assessment: VerificationAssessment
+    assessment_mode: Literal["journey_only", "behaviour_only", "unified"] = "unified"
     warnings: list[str] = Field(default_factory=list)
     completeness: Literal[
         "online_behaviour_only",

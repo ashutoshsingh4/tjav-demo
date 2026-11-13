@@ -33,8 +33,8 @@ Pipeline per turn
 6. Final response delivery event (plain text, delivered to the caller)
     → final_response_delivered
 
-The workflow is intentionally explicit so its event semantics are easy to
-inspect in the accompanying verification pipeline.
+Following the pattern in:
+    src/model/demos/ra_custom_orchestrator_emitted_events/agent.py
 """
 
 from __future__ import annotations

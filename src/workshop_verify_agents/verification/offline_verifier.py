@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import Literal
+
 from workshop_verify_agents.journey.journey_classifier import classify_conversation
 from workshop_verify_agents.journey.journey_weighted_scorer import compare_scoring_methods
 from workshop_verify_agents.verification.evidence_builder import (
@@ -20,7 +22,6 @@ from workshop_verify_agents.verification.verification_results import (
     UnifiedConversationResult,
 )
 
-
 _BEHAVIOUR_EVIDENCE_TYPES = {
     EvidenceType.behaviour,
     EvidenceType.governance,
@@ -35,6 +36,7 @@ def verify_completed_conversation(
     turn_scores: list[float] | None = None,
     journey_stage_labels: list[str] | None = None,
     conversation_exchanges: list[dict] | None = None,
+    assessment_mode: Literal["journey_only", "behaviour_only", "unified"] = "unified",
 ) -> UnifiedConversationResult:
     """Run offline conversation-level unified verification.
 
@@ -106,15 +108,21 @@ def verify_completed_conversation(
             )
             completeness = "offline_full"
 
-    combined_evidence = [
-        *behaviour_evidence_conversation_scope,
-        *outcome_evidence,
-    ]
+    if assessment_mode == "journey_only":
+        assessment_evidence = outcome_evidence
+    elif assessment_mode == "behaviour_only":
+        assessment_evidence = behaviour_evidence_conversation_scope
+    else:
+        assessment_evidence = [
+            *behaviour_evidence_conversation_scope,
+            *outcome_evidence,
+        ]
 
     final_assessment = assess(
-        evidence_items=combined_evidence,
+        evidence_items=assessment_evidence,
         signals=all_signals,
         conversation_id=conversation_id,
+        allow_missing_outcome=assessment_mode == "behaviour_only",
     )
 
     return UnifiedConversationResult(
@@ -123,6 +131,7 @@ def verify_completed_conversation(
         behaviour_evidence_conversation_scope=behaviour_evidence_conversation_scope,
         outcome_result=outcome_result,
         final_assessment=final_assessment,
+        assessment_mode=assessment_mode,
         warnings=warnings,
         completeness=completeness,
     )

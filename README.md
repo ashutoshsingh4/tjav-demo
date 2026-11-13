@@ -1,76 +1,81 @@
-# Agent Verification Demo
+# TJAV — Trajectory and Journey-Aware Verifier
 
-This supplementary package reproduces the workshop demonstrator for verifying enterprise conversational agents.
+TJAV is a research demonstrator for auditable verification of conversational
+agents. It combines trace-derived behaviour evidence with journey-aware outcome
+evidence. The reported experiment is deterministic and offline.
 
-The demo has two complementary lanes:
+## What is included
 
-- **Behaviour verification:** runtime events are normalized into an `ExecutionTrace`, mapped to business signals, checked against applicable controls, and converted into evidence.
-- **Journey-aware outcome verification:** deterministic conversation exchanges use supplied journey stages and quality scores to compare simple and stage-weighted outcomes.
+- A deterministic synthetic runtime that needs no API key or external service.
+- An optional Google ADK runtime using OpenAI as its model provider.
+- A shared verification pipeline for traces, signals, evidence, and assessments.
+- Fifteen controlled, author-constructed scenarios and a report generator.
+- Tests and the accepted paper source/assets.
 
-The offline path is deterministic and requires no API key. The optional ADK path runs the same verification pipeline over live OpenAI-backed agent events.
+The scenarios use supplied journey-stage labels and quality scores. They test
+implemented evidence rules; they are not a representative sample, live-agent
+benchmark, or production validation.
 
-## Quickstart
+## Install
 
-Requires Python 3.10-3.13 and [uv](https://docs.astral.sh/uv/).
+Python 3.10–3.13 and [uv](https://docs.astral.sh/uv/) are supported.
 
-```text
+```shell
 uv sync
+```
+
+For the optional ADK/OpenAI runtime:
+
+```shell
+uv sync --extra adk
+```
+
+Set `MODEL_PROVIDER=openai`, `MODEL_NAME` to an OpenAI-supported model, and
+`OPENAI_API_KEY` in the process environment before using ADK mode. The project
+does not store credentials.
+
+## Run
+
+Deterministic synthetic runtime:
+
+```shell
 uv run python -m workshop_verify_agents.app --mode synthetic --query "How does mortgage affordability work?"
-uv run python -m workshop_verify_agents.demo_offline_verification
-uv run pytest -q
 ```
 
-The five deterministic scenarios are listed in `docs/scenario_index.md`.
+Optional ADK runtime:
 
-## Optional OpenAI run
-
-The live path is optional and incurs OpenAI API usage costs. Create a local environment file from the template:
-
-PowerShell:
-
-```powershell
-Copy-Item sample.env .env
-```
-
-Git Bash:
-
-```bash
-cp sample.env .env
-```
-
-Set `OPENAI_API_KEY` in `.env`, then run:
-
-```text
+```shell
 uv run python -m workshop_verify_agents.app --mode adk --query "How does mortgage affordability work?"
 ```
 
-`OPENAI_MODEL` defaults to `gpt-4o-mini`. Never commit `.env` or an API key.
+Generate the reported 15-scenario outputs:
 
-### TLS certificate troubleshooting
-
-If the request fails with `CERTIFICATE_VERIFY_FAILED`, Python does not trust
-the certificate presented by the local HTTPS proxy. First ensure your
-organization's root CA is installed in the Windows certificate store; the demo
-uses that store through `truststore`. If the CA is supplied as a PEM bundle,
-set `SSL_CERT_FILE` in `.env` to its absolute path, for example:
-
-```env
-SSL_CERT_FILE=C:/path/to/corporate-root-ca-bundle.pem
+```shell
+uv run python -m workshop_verify_agents.assurance_interpretation --output-dir <output-directory>
 ```
 
-Do not set certificate verification to `false` and do not work around this
-error by disabling TLS. The LiteLLM remote cost-map warning is harmless; the
-actual API request must still be able to establish a verified HTTPS connection.
+Run tests:
 
-## Design boundary
-
-The synthetic and ADK runtimes both produce the shared `ExecutionTrace` representation. The offline journey scores and stage labels are deterministic workshop inputs; the live ADK path does not derive quality scores from model output.
-
-## Layout
-
-```text
-src/model/                         OpenAI model configuration for ADK
-src/workshop_verify_agents/        runtime, verification, journey, and scenarios
-tests/                             unit and end-to-end tests
-docs/                              concise architecture and scenario notes
+```shell
+uv run pytest -q
 ```
+
+## Project layout
+
+- `src/workshop_verify_agents/`: runtimes and shared verification implementation.
+- `tests/`: deterministic, ADK adapter, and mocked OpenAI-provider tests.
+- `docs/`: architecture, evidence policy, scenario index, and research context.
+- `docs/paper/`: accepted paper source and its assets.
+
+The optional live-provider path is separate from the deterministic reported
+results. The public ADK integration supports text-only requests; streaming,
+tools, multimodal content, structured output, and non-default generation
+settings are not supported by its current adapter.
+
+## License and third-party material
+
+TJAV project code is intended to be released under the MIT License; replace
+the copyright-holder placeholder in `LICENSE` with the authorized rights
+holder before publication. Third-party paper templates, figures, dependencies,
+and other included material may have separate terms and are not relicensed by
+the project license.

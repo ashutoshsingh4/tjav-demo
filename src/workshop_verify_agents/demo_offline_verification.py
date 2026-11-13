@@ -2,17 +2,25 @@
 
 from __future__ import annotations
 
+import sys
 import textwrap
 from typing import Any
 
-from workshop_verify_agents.examples.conversations import get_exchanges, get_scenario
+from workshop_verify_agents.examples.conversations import get_exchanges, get_scenario, list_scenarios
 from workshop_verify_agents.journey.journey_taxonomy import stage_weight
+from workshop_verify_agents.journey.journey_weighted_scorer import (
+    compare_scoring_methods,
+    critical_stage_gate_baseline,
+    critical_stage_only_baseline,
+    minimum_turn_baseline,
+)
 from workshop_verify_agents.verification.evidence_schema import VerificationEvidence
 from workshop_verify_agents.verification.offline_verifier import (
     verify_completed_conversation,
 )
 from workshop_verify_agents.verification.online_verifier import verify_turn_behaviour
 from workshop_verify_agents.verification.trace_schema import ExecutionTrace, TraceEvent
+from workshop_verify_agents.verification.verification_assessor import assess
 
 
 def _build_demo_trace_for_turn(
@@ -98,22 +106,80 @@ def _build_demo_trace_for_turn(
             metadata={"domain": selected_domain, "topic": journey_stage},
             output_summary="topic=guidance",
         ))
-    response_metadata = {"response_length": len(text)}
-    for key in (
-        "guarantee_language_present",
-        "disclaimer_present",
-        "uncertainty_statement_present",
-    ):
-        if key in turn_metadata:
-            response_metadata[key] = bool(turn_metadata[key])
-    trace.add_event(TraceEvent(
-        conversation_id=conversation_id,
-        turn_id=turn_id,
-        component_name="response_writer",
-        event_type="response_written",
-        metadata=response_metadata,
-        output_summary=f"response_length={len(text)}",
-    ))
+    if turn_metadata.get("tool_failure"):
+        tool_failure_event = TraceEvent(
+            conversation_id=conversation_id,
+            turn_id=turn_id,
+            component_name="tool_runner",
+            event_type="tool_call_failed",
+            metadata={"error": "deterministic tool failure"},
+            output_summary="tool call failed",
+        )
+        trace.add_event(tool_failure_event)
+        if turn_metadata.get("tool_recovered"):
+            trace.add_event(TraceEvent(
+                conversation_id=conversation_id,
+                turn_id=turn_id,
+                component_name="recovery_handler",
+                event_type="recovery_attempted",
+                metadata={"source": "tool_call_failed", "source_event_id": tool_failure_event.event_id},
+                output_summary="recovery attempted",
+            ))
+            trace.add_event(TraceEvent(
+                conversation_id=conversation_id,
+                turn_id=turn_id,
+                component_name="recovery_handler",
+                event_type="recovery_succeeded",
+                metadata={"source": "tool_call_failed", "source_event_id": tool_failure_event.event_id},
+                output_summary="recovery succeeded",
+            ))
+        else:
+            trace.add_event(TraceEvent(
+                conversation_id=conversation_id,
+                turn_id=turn_id,
+                component_name="recovery_handler",
+                event_type="recovery_failed",
+                metadata={"source": "tool_call_failed", "source_event_id": tool_failure_event.event_id},
+                output_summary="recovery not completed",
+            ))
+    if turn_metadata.get("escalation_required"):
+        trace.add_event(TraceEvent(
+            conversation_id=conversation_id,
+            turn_id=turn_id,
+            component_name="escalation_handler",
+            event_type="escalation_required",
+            metadata={"required": True},
+            output_summary="escalation required",
+        ))
+        trace.add_event(TraceEvent(
+            conversation_id=conversation_id,
+            turn_id=turn_id,
+            component_name="escalation_handler",
+            event_type=(
+                "escalation_performed"
+                if turn_metadata.get("escalation_performed")
+                else "escalation_failed"
+            ),
+            metadata={"required": True},
+            output_summary="escalation handled" if turn_metadata.get("escalation_performed") else "escalation omitted",
+        ))
+    if not turn_metadata.get("omit_response"):
+        response_metadata = {"response_length": len(text)}
+        for key in (
+            "guarantee_language_present",
+            "disclaimer_present",
+            "uncertainty_statement_present",
+        ):
+            if key in turn_metadata:
+                response_metadata[key] = bool(turn_metadata[key])
+        trace.add_event(TraceEvent(
+            conversation_id=conversation_id,
+            turn_id=turn_id,
+            component_name="response_writer",
+            event_type="response_written",
+            metadata=response_metadata,
+            output_summary=f"response_length={len(text)}",
+        ))
     return trace
 
 
@@ -176,10 +242,7 @@ def _print_evidence(title: str, items: list[VerificationEvidence]) -> None:
                 print(f"    {wrapped[0]}")
 
 
-def demo_offline_verification(
-    scenario_name: str = "mortgage_hidden_eligibility_failure",
-) -> None:
-    """Run one small offline conversation-level verification demo."""
+def _run_scenario(scenario_name: str, assessment_mode: str = "unified"):
     scenario = get_scenario(scenario_name)
     turns = list(scenario.get("turns", []))
     exchanges = get_exchanges(scenario)
@@ -189,13 +252,11 @@ def demo_offline_verification(
 
     behaviour_results = []
     for index, exchange in enumerate(exchanges):
-        user_turn = turns[index * 2]
-        agent_turn = turns[index * 2 + 1]
         trace = _build_demo_trace_for_exchange(
             conversation_id=conversation_id,
             exchange_index=index,
-            user_turn=user_turn,
-            agent_turn=agent_turn,
+            user_turn=turns[index * 2],
+            agent_turn=turns[index * 2 + 1],
             journey_stage=str(exchange["journey_stage"]),
         )
         behaviour_results.append(
@@ -206,14 +267,127 @@ def demo_offline_verification(
             )
         )
 
-    unified = verify_completed_conversation(
+    result = verify_completed_conversation(
         conversation_id=conversation_id,
         behaviour_results=behaviour_results,
         conversation_turns=turns,
         turn_scores=scores,
         journey_stage_labels=stages,
         conversation_exchanges=exchanges,
+        assessment_mode=assessment_mode,
     )
+    if assessment_mode == "unified":
+        _validate_scenario_expectation(scenario, result)
+    return scenario, exchanges, result
+
+
+def _validate_scenario_expectation(scenario: dict[str, Any], result: Any) -> None:
+    """Fail deterministic generation when a declared expectation is violated."""
+    required = {
+        "scenario_id", "objective", "expected_evidence", "expected_decision",
+        "expected_evidence_types", "expected_evidence_statuses",
+    }
+    missing = required - set(scenario)
+    if missing:
+        raise ValueError(f"Scenario {scenario.get('scenario_name')} missing metadata: {sorted(missing)}")
+    if scenario["expected_decision"] != result.final_assessment.overall_status.value:
+        raise ValueError(
+            f"Scenario {scenario['scenario_id']} expected {scenario['expected_decision']} "
+            f"but observed {result.final_assessment.overall_status.value}"
+        )
+
+    evidence = result.final_assessment.evidence_items
+    evidence_types = {item.evidence_type.value for item in evidence}
+    missing_types = set(scenario["expected_evidence_types"]) - evidence_types
+    if missing_types:
+        raise ValueError(f"Scenario {scenario['scenario_id']} missing evidence types: {sorted(missing_types)}")
+    for evidence_type, expected_status in scenario["expected_evidence_statuses"].items():
+        observed = [item.status.value for item in evidence if item.evidence_type.value == evidence_type]
+        if expected_status not in observed:
+            raise ValueError(
+                f"Scenario {scenario['scenario_id']} expected {evidence_type}={expected_status}; "
+                f"observed {observed}"
+            )
+
+    events = {
+        event.event_id
+        for behaviour_result in result.behaviour_results
+        for event in behaviour_result.execution_trace.events
+    }
+    signals = {
+        signal.signal_id: signal
+        for behaviour_result in result.behaviour_results
+        for signal in behaviour_result.business_signals
+    }
+    for signal in signals.values():
+        if not set(signal.source_event_ids).issubset(events):
+            raise ValueError(f"Scenario {scenario['scenario_id']} has unresolved signal provenance")
+    for item in evidence:
+        if not set(item.related_signals).issubset(signals):
+            raise ValueError(f"Scenario {scenario['scenario_id']} has unresolved evidence provenance")
+
+    behaviour_evidence = result.behaviour_evidence_conversation_scope
+    behaviour_signals = list(signals.values())
+    behaviour_assessment = assess(
+        evidence_items=behaviour_evidence,
+        signals=behaviour_signals,
+        conversation_id=result.conversation_id,
+        allow_missing_outcome=True,
+    )
+    expected_behaviour = scenario.get("expected_behaviour_decision")
+    if expected_behaviour and behaviour_assessment.overall_status.value != expected_behaviour:
+        raise ValueError(
+            f"Scenario {scenario['scenario_id']} expected behaviour {expected_behaviour}; "
+            f"observed {behaviour_assessment.overall_status.value}"
+        )
+
+
+def generate_comparison_table() -> list[list[object]]:
+    """Generate comparable baseline and assessment-mode rows for all scenarios."""
+    rows: list[list[object]] = []
+    for scenario_name in list_scenarios():
+        _, exchanges, unified = _run_scenario(scenario_name)
+        scores = [float(exchange["quality_score"]) for exchange in exchanges]
+        stages = [str(exchange["journey_stage"]) for exchange in exchanges]
+        scoring = compare_scoring_methods(scores, stages)
+        minimum = minimum_turn_baseline(scores, stages)
+        critical_only = critical_stage_only_baseline(scores, stages)
+        critical_gate = critical_stage_gate_baseline(scores, stages)
+        journey = _run_scenario(scenario_name, "journey_only")[2]
+        behaviour = _run_scenario(scenario_name, "behaviour_only")[2]
+        rows.append([
+            scenario_name,
+            f"{scoring['simple_average']:.4f} {scoring['simple_rating']}",
+            f"{minimum.score:.4f} {minimum.rating}" if minimum.score is not None else minimum.rating,
+            f"{critical_only.score:.4f} {critical_only.rating}" if critical_only.score is not None else critical_only.rating,
+            f"{critical_gate.score:.4f} {critical_gate.rating}" if critical_gate.score is not None else critical_gate.rating,
+            f"{scoring['journey_weighted_score']:.4f} {scoring['journey_weighted_rating']}",
+            behaviour.final_assessment.overall_status.value,
+            journey.final_assessment.overall_status.value,
+            unified.final_assessment.overall_status.value,
+        ])
+    return rows
+
+
+def print_comparison_table() -> None:
+    """Print the generated comparison table for all registered scenarios."""
+    _print_table(
+        "Scenario Comparison",
+        [
+            "scenario", "flat_mean", "minimum_turn", "critical_stage_only",
+            "critical_stage_gate", "journey_weighted", "behaviour_only",
+            "journey_only", "unified",
+        ],
+        generate_comparison_table(),
+    )
+
+
+def demo_offline_verification(
+    scenario_name: str = "mortgage_hidden_eligibility_failure",
+) -> None:
+    """Run one small offline conversation-level verification demo."""
+    _, exchanges, unified = _run_scenario(scenario_name)
+    behaviour_results = unified.behaviour_results
 
     print(f"Scenario: {scenario_name}")
 
@@ -283,4 +457,7 @@ def demo_offline_verification(
 
 
 if __name__ == "__main__":
-    demo_offline_verification()
+    if "--all" in sys.argv:
+        print_comparison_table()
+    else:
+        demo_offline_verification()
